@@ -10,55 +10,62 @@ import asyncio
 import pytz
 from dotenv import load_dotenv
 
-# 環境変数の読み込み
 load_dotenv()
 
-# --- 1. Flask ダミーサーバー設定 (Renderの起動エラー対策) ---
 app = Flask(__name__)
-
 @app.route('/')
-def home():
-    return "Bot is alive!"
+def home(): return "Bot is alive!"
 
 def run_flask():
-    # Renderが指定するポート（デフォルト10000）で起動
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# --- 2. 天気予報・服装アドバイスロジック (GASより移植) ---
+# --- 改良版：天気予報・服装アドバイスロジック ---
 def get_fashion_advice(temp):
     try:
         temp = float(temp)
     except (ValueError, TypeError):
         return "適切な服装をお選びください"
 
-    if temp >= 28:
-        return "ノースリーブ＋薄手スカート。UV対策もおすすめ"
-    elif temp >= 24:
-        return "半袖ブラウスやワンピースが快適"
-    elif temp >= 20:
-        return "薄手シャツやカーディガンがちょうど良い"
-    elif temp >= 16:
-        return "ライトジャケットがあると安心"
-    elif temp >= 10:
-        return "ニット＋コート系がおすすめ"
-    else:
-        return "厚手コート・防寒重視がおすすめ"
+    if temp >= 28: return "ノースリーブ＋薄手スカート。UV対策もおすすめ"
+    elif temp >= 24: return "半袖ブラウスやワンピースが快適"
+    elif temp >= 20: return "薄手シャツやカーディガンがちょうど良い"
+    elif temp >= 16: return "ライトジャケットがあると安心"
+    elif temp >= 10: return "ニット＋コート系がおすすめ"
+    else: return "厚手コート・防寒重視がおすすめ"
 
 def get_tokyo_weather():
     url = "https://www.jma.go.jp/bosai/forecast/data/forecast/130000.json"
     try:
         response = requests.get(url)
         data = response.json()
+        
+        # 天気
         weather = data[0]["timeSeries"][0]["areas"][0]["weathers"][0]
         
+        # 気温取得の改良
         temp_min = "不明"
         temp_max = "不明"
-        temp_areas = data[0]["timeSeries"][2]["areas"]
-        for area in temp_areas:
+        temp_series = data[0]["timeSeries"][2]["areas"]
+        
+        for area in temp_series:
             if area["area"]["name"] == "東京":
-                temp_min = area["temps"][0]
-                temp_max = area["temps"][1]
+                # 数値だけを抽出してリスト化
+                temps = []
+                for t in area["temps"]:
+                    try:
+                        temps.append(float(t))
+                    except ValueError:
+                        continue
+                
+                if len(temps) >= 2:
+                    # 2つ以上ある場合は、小さい方を最低、大きい方を最高とする
+                    # ※気象庁のデータ順序（今日最高/明日最低など）に左右されないための処理
+                    temp_min = int(min(temps))
+                    temp_max = int(max(temps))
+                elif len(temps) == 1:
+                    # 1つしかない場合は、それを最高気温として扱う
+                    temp_max = int(temps[0])
                 break
         
         advice = get_fashion_advice(temp_max)
@@ -73,7 +80,7 @@ def get_tokyo_weather():
     except Exception as e:
         return f"天気情報の取得に失敗しました: {e}"
 
-# --- 3. Discord Bot 設定 ---
+# --- Discord Bot 本体 ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
@@ -84,30 +91,21 @@ class MyBot(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        # 定期実行タスクを開始
         self.daily_weather_task.start()
-        # スラッシュコマンドを同期
         if GUILD_ID:
             guild = discord.Object(id=int(GUILD_ID))
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
-            print(f"Synced to guild: {GUILD_ID}")
 
-    # 1分ごとにチェックを行うループ
     @tasks.loop(seconds=60)
     async def daily_weather_task(self):
         jst = pytz.timezone('Asia/Tokyo')
         now = datetime.now(jst)
-        
-        # 毎日 朝6時00分 にメッセージを送信
         if now.hour == 6 and now.minute == 0:
             if CHANNEL_ID:
                 channel = self.get_channel(int(CHANNEL_ID))
                 if channel:
-                    message = get_tokyo_weather()
-                    await channel.send(message)
-                    print(f"Daily message sent at {now}")
-                    # 二重送信防止のために1分以上待機
+                    await channel.send(get_tokyo_weather())
                     await asyncio.sleep(61)
 
     @daily_weather_task.before_loop
@@ -116,18 +114,11 @@ class MyBot(discord.Client):
 
 client = MyBot()
 
-# --- 4. スラッシュコマンド (/weather) ---
-@client.tree.command(name="weather", description="東京の天気と服装アドバイスを即座に表示します")
+@client.tree.command(name="weather", description="東京の天気を表示")
 async def weather(interaction: discord.Interaction):
-    message = get_tokyo_weather()
-    await interaction.response.send_message(message)
+    await interaction.response.send_message(get_tokyo_weather())
 
-# --- 5. メイン実行 ---
 if __name__ == "__main__":
-    # RenderのPort Scan対策としてFlaskを別スレッドで起動
     threading.Thread(target=run_flask, daemon=True).start()
-    
     if TOKEN:
         client.run(TOKEN)
-    else:
-        print("Error: DISCORD_BOT_TOKEN not found.")
