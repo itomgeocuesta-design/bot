@@ -85,6 +85,36 @@ TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 GUILD_ID = os.getenv("DISCORD_GUILD_ID")
 CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
 
+# --- メンションに反応する処理 ---
+@client.event
+async def on_message(message):
+    # Bot自身のメッセージには反応しない
+    if message.author == client.user:
+        return
+
+    # Botへのメンションが含まれているかチェック
+    if client.user in message.mentions:
+        content = message.content.lower()
+        
+        # 褒め言葉のリスト
+        compliments = ["かわいい", "可愛い", "すごい", "天才", "えらい", "偉い", "助かる", "好き", "大好き", "すき", "がんばって", "頑張って", "有能"]
+        
+        # 褒め言葉が含まれているか確認
+        if any(word in content for word in compliments):
+            replies = [
+                "えっ…そ、そんなこと言われても何も出ないよ！ (/// \/\/\/)",
+                "あ、ありがとう…。急に言われると照れるな…。",
+                "ふん、当たり前でしょ！…でも、そんなに褒められるのは悪くないかも…。",
+                "（照れて顔をそらしている）",
+                "も、もう！お世辞はやめてよ！嬉しいけど！",
+                "かもねさんに褒められるととっても嬉しい！"
+            ]
+            import random
+            await message.reply(random.choice(replies))
+        else:
+            # 褒め言葉以外のメンションへの反応（必要なら）
+            await message.reply("呼んだ？何か手伝えることがあったら言ってね！")
+
 class MyBot(discord.Client):
     def __init__(self):
         super().__init__(intents=discord.Intents.default())
