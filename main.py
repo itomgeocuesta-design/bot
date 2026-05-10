@@ -101,7 +101,7 @@ class MyBot(discord.Client):
     async def daily_weather_task(self):
         jst = pytz.timezone('Asia/Tokyo')
         now = datetime.now(jst)
-        if now.hour == 6 and now.minute == 0:
+        if now.hour == 6 and now.minute == 30:
             if CHANNEL_ID:
                 channel = self.get_channel(int(CHANNEL_ID))
                 if channel:
