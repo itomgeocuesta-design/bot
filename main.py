@@ -117,7 +117,10 @@ async def on_message(message):
 
 class MyBot(discord.Client):
     def __init__(self):
-        super().__init__(intents=discord.Intents.default())
+        # インテントの設定を変更
+        intents = discord.Intents.default()
+        intents.message_content = True  # これを追加
+        super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
