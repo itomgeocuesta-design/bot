@@ -130,7 +130,7 @@ async def on_message(message):
 
     # 3. Botへのメンションが含まれているかチェック
     if client.user in message.mentions:
-        # ...（以下、褒め言葉の処理）
+        await asyncio.sleep(0.5)
         content = message.content.lower()
         
         # 褒め言葉のリスト
