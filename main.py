@@ -120,12 +120,17 @@ client = MyBot()
 # --- メンションに反応する処理 ---
 @client.event
 async def on_message(message):
-    # Bot自身のメッセージには反応しない
+    # 1. Bot自身のメッセージには反応しない
     if message.author == client.user:
         return
+    
+    # 2. スラッシュコマンドによるメッセージ（interaction）は無視する
+    if message.interaction is not None:
+        return
 
-    # Botへのメンションが含まれているかチェック
+    # 3. Botへのメンションが含まれているかチェック
     if client.user in message.mentions:
+        # ...（以下、褒め言葉の処理）
         content = message.content.lower()
         
         # 褒め言葉のリスト
